@@ -451,6 +451,7 @@ static void clear_loaded(ScriptState& state) {
     state.inferred.clear();
     state.inferred_events.clear();
     state.inferred_next = 0;
+    state.events_at.clear();
     state.enum_aliases.clear();
     state.modules.clear();
     state.declared_this_load.clear();
@@ -532,6 +533,7 @@ static void setup_api(flecs::world world, lua_State* lua) {
                 auto it = st.events_at.find(Mods::call_site(chunk, ar.currentline));
                 if (it != st.events_at.end() && !it->second.empty()) {
                     name = it->second.front();
+                    it->second.push_back(name);
                     it->second.pop_front();
                 }
             }
