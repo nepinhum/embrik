@@ -512,15 +512,42 @@ static void setup_api(flecs::world world, lua_State* lua) {
     api_fn(root, state, "", "require", "(string) -> any", [world](const std::string& path) -> LuaRef { return Mods::require(world, path); });
 
     auto events = luabridge::getGlobalNamespace(lua).beginNamespace("events");
-    api_fn(events, state, "events", "on", "(...any) -> Sub", [world](const LuaRef& handler, lua_State* s) -> LuaRef {
+    api_fn(events, state, "events", "on", "(...any) -> Sub", [world](const LuaRef& first, const LuaRef& second, lua_State* s) -> LuaRef {
         ScriptState& st = ScriptState::of(world);
-        if (handler.isFunction() && st.inferred_next < st.inferred_events.size()) {
-            std::string name = st.inferred_events[st.inferred_next++];
-            auto& vec = st.handlers[name];
-            vec.push_back(handler);
-            return LuaRef(s, ScriptSub{.kind = 0, .name = name, .slot = static_cast<int>(vec.size()) - 1});
+        LuaRef handler = first.isFunction() ? first : second;
+        if (!handler.isFunction()) {
+            return LuaRef(s);
         }
-        return LuaRef(s);
+
+        std::string name;
+        if (first.isString()) {
+            name = first.unsafe_cast<std::string>();
+        } else if (lua_Debug ar; lua_getinfo(s, 1, "sl", &ar) != 0) {
+            const char* source = ar.source != nullptr ? ar.source : ar.short_src;
+            if (source != nullptr) {
+                std::string chunk = source;
+                if (!chunk.empty() && (chunk.front() == '=' || chunk.front() == '@')) {
+                    chunk.erase(0, 1);
+                }
+                auto it = st.events_at.find(Mods::call_site(chunk, ar.currentline));
+                if (it != st.events_at.end() && !it->second.empty()) {
+                    name = it->second.front();
+                    it->second.pop_front();
+                }
+            }
+        }
+        if (name.empty()) {
+            if (st.inferred_next >= st.inferred_events.size()) {
+                SDL_Log("[script] events.on: no event for this handler; annotate it or pass the name");
+                return LuaRef(s);
+            }
+            name = st.inferred_events[st.inferred_next++];
+            SDL_Log("[script] events.on: no annotation at the call site, assuming '%s'", name.c_str());
+        }
+
+        auto& vec = st.handlers[name];
+        vec.push_back(handler);
+        return LuaRef(s, ScriptSub{.kind = 0, .name = name, .slot = static_cast<int>(vec.size()) - 1});
     });
     api_fn(events, state, "events", "signal", "<T>() -> Signal<T>", [world](lua_State* s) -> LuaRef { return LuaRef(s, ScriptSignal{.id = ScriptState::of(world).signal_next++}); });
     auto on_component = [](flecs::world world, std::unordered_map<std::string, std::vector<LuaRef>>& map, int kind, const LuaRef& component, const LuaRef& handler, lua_State* s) -> LuaRef {

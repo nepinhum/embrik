@@ -6,6 +6,7 @@
 #include <LuaBridge/LuaBridge.h>
 
 #include <cstdint>
+#include <deque>
 #include <map>
 #include <optional>
 #include <string>
@@ -103,6 +104,7 @@ struct ScriptState {
     std::unordered_map<uint64_t, std::string> usernames;
     std::vector<std::string> inferred_events;
     size_t inferred_next = 0;
+    std::unordered_map<std::string, std::deque<std::string>> events_at;
     std::unordered_map<int, std::vector<LuaRef>> signal_handlers;
     int signal_next = 0;
     std::unordered_map<uint64_t, LuaRef> query_callbacks;
@@ -151,6 +153,7 @@ struct ScriptState {
         usernames.swap(other.usernames);
         inferred_events.swap(other.inferred_events);
         std::swap(inferred_next, other.inferred_next);
+        events_at.swap(other.events_at);
         signal_handlers.swap(other.signal_handlers);
         std::swap(signal_next, other.signal_next);
         query_callbacks.swap(other.query_callbacks);
@@ -166,6 +169,7 @@ struct ScriptState {
         handlers.clear();
         inferred_events.clear();
         inferred_next = 0;
+        events_at.clear();
         component_handlers.clear();
         component_add_handlers.clear();
         component_remove_handlers.clear();

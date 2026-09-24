@@ -129,7 +129,9 @@ static auto event_name_from_type(const char* type) -> std::string {
 struct ModVisitor : Luau::AstVisitor {
     ScriptState& state;
     std::vector<ComponentDef>& components;
-    explicit ModVisitor(ScriptState& target, std::vector<ComponentDef>& comps) : state(target), components(comps) {}
+    std::string chunk;
+    ModVisitor(ScriptState& target, std::vector<ComponentDef>& comps, std::string source_name)
+        : state(target), components(comps), chunk(std::move(source_name)) {}
 
     auto visit(Luau::AstExprCall* call) -> bool override {
         auto* index = call->func->as<Luau::AstExprIndexName>();
@@ -146,7 +148,9 @@ struct ModVisitor : Luau::AstVisitor {
             auto* fn = call->args.data[0]->as<Luau::AstExprFunction>();
             if (global != nullptr && std::strcmp(global->name.value, "events") == 0 && fn != nullptr && fn->args.size >= 1) {
                 if (auto* ref = fn->args.data[0]->annotation != nullptr ? fn->args.data[0]->annotation->as<Luau::AstTypeReference>() : nullptr) {
-                    state.inferred_events.push_back(event_name_from_type(ref->name.value));
+                    std::string event = event_name_from_type(ref->name.value);
+                    state.events_at[Mods::call_site(chunk, static_cast<int>(call->location.begin.line) + 1)].push_back(event);
+                    state.inferred_events.push_back(event);
                 }
             }
         }
@@ -215,7 +219,11 @@ struct ModVisitor : Luau::AstVisitor {
     }
 };
 
-static void analyze_source(flecs::world world, const std::string& source) {
+auto Mods::call_site(const std::string& chunk, int line) -> std::string {
+    return chunk + ":" + std::to_string(line);
+}
+
+static void analyze_source(flecs::world world, const std::string& source, const std::string& chunk) {
     Luau::Allocator allocator;
     Luau::AstNameTable names(allocator);
     Luau::ParseResult result = Luau::Parser::parse(source.data(), source.size(), names, allocator, Luau::ParseOptions());
@@ -223,7 +231,7 @@ static void analyze_source(flecs::world world, const std::string& source) {
         return;
     }
     std::vector<ComponentDef> components;
-    ModVisitor visitor(ScriptState::of(world), components);
+    ModVisitor visitor(ScriptState::of(world), components, chunk);
     result.root->visit(&visitor);
     for (const ComponentDef& def : components) {
         Reflect::define_component(world, def);
@@ -250,7 +258,7 @@ auto Mods::require(flecs::world world, const std::string& path) -> LuaRef {
     std::stringstream buffer;
     buffer << stream.rdbuf();
     std::string source = buffer.str();
-    analyze_source(world, source);
+    analyze_source(world, source, file.string());
     std::string chunk = "=" + file.string();
     size_t length = 0;
     char* bytecode = luau_compile(source.data(), source.size(), nullptr, &length);
@@ -288,7 +296,7 @@ void Mods::load(flecs::world world) {
         std::stringstream buffer;
         buffer << file.rdbuf();
         std::string source = buffer.str();
-        analyze_source(world, source);
+        analyze_source(world, source, path.string());
         std::string chunk = "=" + path.string();
         size_t length = 0;
         char* bytecode = luau_compile(source.data(), source.size(), nullptr, &length);
