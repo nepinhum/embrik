@@ -148,9 +148,8 @@ struct ModVisitor : Luau::AstVisitor {
             auto* fn = call->args.data[0]->as<Luau::AstExprFunction>();
             if (global != nullptr && std::strcmp(global->name.value, "events") == 0 && fn != nullptr && fn->args.size >= 1) {
                 if (auto* ref = fn->args.data[0]->annotation != nullptr ? fn->args.data[0]->annotation->as<Luau::AstTypeReference>() : nullptr) {
-                    std::string event = event_name_from_type(ref->name.value);
-                    state.events_at[Mods::call_site(chunk, static_cast<int>(call->location.begin.line) + 1)].push_back(event);
-                    state.inferred_events.push_back(event);
+                    state.events_at[Mods::call_site(chunk, static_cast<int>(call->location.begin.line) + 1)].push_back(state.inferred_events.size());
+                    state.inferred_events.push_back(event_name_from_type(ref->name.value));
                 }
             }
         }

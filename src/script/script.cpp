@@ -532,18 +532,25 @@ static void setup_api(flecs::world world, lua_State* lua) {
                 }
                 auto it = st.events_at.find(Mods::call_site(chunk, ar.currentline));
                 if (it != st.events_at.end() && !it->second.empty()) {
-                    name = it->second.front();
-                    it->second.push_back(name);
+                    size_t index = it->second.front();
+                    it->second.push_back(index);
                     it->second.pop_front();
+                    st.inferred_used.insert(index);
+                    name = st.inferred_events[index];
                 }
             }
         }
         if (name.empty()) {
+            while (st.inferred_next < st.inferred_events.size() && st.inferred_used.contains(st.inferred_next)) {
+                ++st.inferred_next;
+            }
             if (st.inferred_next >= st.inferred_events.size()) {
                 SDL_Log("[script] events.on: no event for this handler; annotate it or pass the name");
                 return LuaRef(s);
             }
-            name = st.inferred_events[st.inferred_next++];
+            size_t index = st.inferred_next++;
+            st.inferred_used.insert(index);
+            name = st.inferred_events[index];
             SDL_Log("[script] events.on: no annotation at the call site, assuming '%s'", name.c_str());
         }
 
