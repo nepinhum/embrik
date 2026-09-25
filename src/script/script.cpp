@@ -452,6 +452,7 @@ static void clear_loaded(ScriptState& state) {
     state.inferred_events.clear();
     state.inferred_next = 0;
     state.events_at.clear();
+    state.inferred_used.clear();
     state.enum_aliases.clear();
     state.modules.clear();
     state.declared_this_load.clear();
