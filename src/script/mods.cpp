@@ -148,7 +148,13 @@ struct ModVisitor : Luau::AstVisitor {
             auto* fn = call->args.data[0]->as<Luau::AstExprFunction>();
             if (global != nullptr && std::strcmp(global->name.value, "events") == 0 && fn != nullptr && fn->args.size >= 1) {
                 if (auto* ref = fn->args.data[0]->annotation != nullptr ? fn->args.data[0]->annotation->as<Luau::AstTypeReference>() : nullptr) {
-                    state.events_at[Mods::call_site(chunk, static_cast<int>(call->location.begin.line) + 1)].push_back(state.inferred_events.size());
+                    std::string key = Mods::call_site(chunk, static_cast<int>(call->location.begin.line) + 1);
+                    auto& site = state.events_at[key];
+                    if (!site.queue.empty()) {
+                        site.shared = true;
+                        SDL_Log("[script] events.on: %s holds more than one handler; they bind in the order they run, so split the line or pass the event name", key.c_str());
+                    }
+                    site.queue.push_back(state.inferred_events.size());
                     state.inferred_events.push_back(event_name_from_type(ref->name.value));
                 }
             }

@@ -532,10 +532,12 @@ static void setup_api(flecs::world world, lua_State* lua) {
                     chunk.erase(0, 1);
                 }
                 auto it = st.events_at.find(Mods::call_site(chunk, ar.currentline));
-                if (it != st.events_at.end() && !it->second.empty()) {
-                    size_t index = it->second.front();
-                    it->second.push_back(index);
-                    it->second.pop_front();
+                if (it != st.events_at.end() && !it->second.queue.empty()) {
+                    size_t index = it->second.queue.front();
+                    it->second.queue.pop_front();
+                    if (!it->second.shared) {
+                        it->second.queue.push_back(index);
+                    }
                     st.inferred_used.insert(index);
                     name = st.inferred_events[index];
                 }

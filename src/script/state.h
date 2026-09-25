@@ -104,7 +104,11 @@ struct ScriptState {
     std::unordered_map<uint64_t, std::string> usernames;
     std::vector<std::string> inferred_events;
     size_t inferred_next = 0;
-    std::unordered_map<std::string, std::deque<size_t>> events_at;
+    struct EventSite {
+        std::deque<size_t> queue;
+        bool shared = false;
+    };
+    std::unordered_map<std::string, EventSite> events_at;
     std::unordered_set<size_t> inferred_used;
     std::unordered_map<int, std::vector<LuaRef>> signal_handlers;
     int signal_next = 0;
